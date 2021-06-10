@@ -2,7 +2,7 @@ const db = require('../../data/db-config')
 
 function find() { // EXERCISE A
   return db('schemes as sc').select('sc.*')
-    .count('st.step_id', {as: 'number_of_steps'})
+    .count('st.step_id as number_of_steps')
     .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
     .groupBy('sc.scheme_id')
     .orderBy('sc.scheme_id', 'asc')
@@ -17,18 +17,27 @@ function find() { // EXERCISE A
 async function findById(scheme_id) { // EXERCISE B
   const rows = await db('schemes as sc')
     .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
-    .select('sc.scheme_name', 'st.*')
     .where('sc.scheme_id', scheme_id)
+    .select('st.*', 'sc.scheme_name', 'sc.scheme_id')
     .orderBy('st.step_number', 'asc')
 
-  const transformed = rows.map(row => {
-    if (row.step_number || row.instructions || row.step_id) {
-      return { ...row, steps: [row.step_id, row.step_number, row.instructions]}
-    } else {
-      return { ...row, steps: []}
+  const result = {
+    scheme_id: rows[0].scheme_id,
+    scheme_name: rows[0].scheme_name,
+    steps: []
+  }
+  
+  rows.forEach(row => {
+    if (row.step_id) {
+      result.steps.push({
+        step_id: row.step_id,
+        step_number: row.step_number,
+        instructions: row.instructions
+      })
     }
   })
-  return transformed
+
+  return result
   /*
     1B- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`:
 
@@ -97,21 +106,23 @@ async function findById(scheme_id) { // EXERCISE B
 }
 
 async function findSteps(scheme_id) { // EXERCISE C
-  const rows = await db('steps as st')
-    .leftJoin('schemes as sc', 'st.scheme_id', 'sc.scheme_id')
-    .select('st.*', 'sc.scheme_name')
-    .where('st.scheme_id', scheme_id)
+  const rows = await db('schemes as sc')
+    .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
+    .select('st.step_id', 'st.step_number', 'instructions', 'sc.scheme_name')
+    .where('sc.scheme_id', scheme_id)
     .orderBy('st.step_number', 'asc')
 
+  if (!rows[0].step_id) return []
   return rows
   /*
     1C- Build a query in Knex that returns the following data.
     The steps should be sorted by step_number, and the array
     should be empty if there are no steps for the scheme:
 
-    select * from steps as st
-    left join schemes as sc
-      on st.scheme_id = sc.scheme_id
+    select step_id, step_number, instructions, scheme_name from schemes as sc
+    left join steps as st
+    on sc.scheme_id = st.scheme_id
+    where sc.scheme_id = 1
     order by st.step_number
 
       [
