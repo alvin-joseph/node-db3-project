@@ -1,23 +1,34 @@
+const db = require('../../data/db-config')
+
 function find() { // EXERCISE A
-  /*
-    1A- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`.
-    What happens if we change from a LEFT join to an INNER join?
-
-      SELECT
-          sc.*,
-          count(st.step_id) as number_of_steps
-      FROM schemes as sc
-      LEFT JOIN steps as st
-          ON sc.scheme_id = st.scheme_id
-      GROUP BY sc.scheme_id
-      ORDER BY sc.scheme_id ASC;
-
-    2A- When you have a grasp on the query go ahead and build it in Knex.
-    Return from this function the resulting dataset.
-  */
+  return db('schemes as sc').select('sc.*')
+    .count('st.step_id', {as: 'number_of_steps'})
+    .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
+    .groupBy('sc.scheme_id')
+    .orderBy('sc.scheme_id', 'asc')
+   /* select sc.*, count(st.step_id) as number_of_steps
+    from schemes as sc
+    left join steps as st
+      on sc.scheme_id = st.scheme_id
+    group by sc.scheme_id
+    order by sc.scheme_id asc */
 }
 
-function findById(scheme_id) { // EXERCISE B
+async function findById(scheme_id) { // EXERCISE B
+  const rows = await db('schemes as sc')
+    .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
+    .select('sc.scheme_name', 'st.*')
+    .where('sc.scheme_id', scheme_id)
+    .orderBy('st.step_number', 'asc')
+
+  const transformed = rows.map(row => {
+    if (row.step_number || row.instructions || row.step_id) {
+      return { ...row, steps: [row.step_id, row.step_number, row.instructions]}
+    } else {
+      return { ...row, steps: []}
+    }
+  })
+  return transformed
   /*
     1B- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`:
 
@@ -85,11 +96,23 @@ function findById(scheme_id) { // EXERCISE B
   */
 }
 
-function findSteps(scheme_id) { // EXERCISE C
+async function findSteps(scheme_id) { // EXERCISE C
+  const rows = await db('steps as st')
+    .leftJoin('schemes as sc', 'st.scheme_id', 'sc.scheme_id')
+    .select('st.*', 'sc.scheme_name')
+    .where('st.scheme_id', scheme_id)
+    .orderBy('st.step_number', 'asc')
+
+  return rows
   /*
     1C- Build a query in Knex that returns the following data.
     The steps should be sorted by step_number, and the array
     should be empty if there are no steps for the scheme:
+
+    select * from steps as st
+    left join schemes as sc
+      on st.scheme_id = sc.scheme_id
+    order by st.step_number
 
       [
         {
